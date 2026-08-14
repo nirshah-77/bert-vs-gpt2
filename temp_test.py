@@ -12,7 +12,7 @@ import csv
 import os
 from datetime import datetime
 
-from src.config import RESULTS_CSV, RESULTS_DIR                        # from config.py (Step 6)
+from intent-ablation/src/config import RESULTS_CSV, RESULTS_DIR                        # from config.py (Step 6)
 
 HEADER = [                                                          # exact schema from the plan
     "model", "strategy", "seed", "trainable_params", "total_params",
