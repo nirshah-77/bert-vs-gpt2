@@ -23,7 +23,7 @@ MODEL_NAMES = {
 }
 
 HYPERPARAMS = {
-    "frozen": {"lr": 1e-3, "max_epochs": 10},
+    "frozen": {"lr": 1e-3, "max_epochs": 100},
     "lora":   {"lr": 2e-4, "max_epochs": 6},
     "full":   {"lr": 2e-5, "max_epochs": 4},
 }
