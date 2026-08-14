@@ -1,0 +1,6 @@
+transformers
+datasets
+torch
+peft
+scikit-learn
+pandas
