@@ -54,6 +54,12 @@
 #     append_dummy_row()
 #     show_current_contents()
 
+# from config import RESULTS_CSV
+# with open(RESULTS_CSV, "r") as f:
+#     print(f.read())
+
+import pandas as pd
 from config import RESULTS_CSV
-with open(RESULTS_CSV, "r") as f:
-    print(f.read())
+df = pd.read_csv(RESULTS_CSV)
+df = df[df["seed"] != 42]  # or df.iloc[0:0] to just keep header — but only if this is genuinely the only test row
+df.to_csv(RESULTS_CSV, index=False)
