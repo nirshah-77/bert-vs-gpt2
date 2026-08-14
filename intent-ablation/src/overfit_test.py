@@ -21,7 +21,7 @@ class OverfitDataset(Dataset):                                       # tiny wrap
         return item
 
 
-def run_overfit_test(model_key, num_examples=100, steps=30):
+def run_overfit_test(model_key, num_examples=100, steps=200):
     train_enc, _, _, _ = get_data(model_key)                         # reuse Stage 1 tokenization (Step 1)
 
     small_enc = {k: v[:num_examples] for k, v in train_enc.items()}  # first 100 examples only
