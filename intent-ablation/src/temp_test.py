@@ -58,8 +58,43 @@
 # with open(RESULTS_CSV, "r") as f:
 #     print(f.read())
 
-import pandas as pd
-from config import RESULTS_CSV
-df = pd.read_csv(RESULTS_CSV)
-df = df[df["seed"] != 42]  # or df.iloc[0:0] to just keep header — but only if this is genuinely the only test row
-df.to_csv(RESULTS_CSV, index=False)
+# import pandas as pd
+# from config import RESULTS_CSV
+# df = pd.read_csv(RESULTS_CSV)
+# df = df[df["seed"] != 42]  # or df.iloc[0:0] to just keep header — but only if this is genuinely the only test row
+# df.to_csv(RESULTS_CSV, index=False)
+
+import torch
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score
+from transformers import AutoModel
+
+from data import get_data, train_df, val_df
+
+def extract_and_probe(model_key="bert"):
+    train_enc, val_enc, _, _ = get_data(model_key)
+    base_model = AutoModel.from_pretrained("bert-base-uncased")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    base_model.to(device).eval()
+
+    def get_pooled(enc):
+        feats = []
+        with torch.no_grad():
+            for i in range(0, len(enc["input_ids"]), 64):
+                batch = {k: torch.tensor(v[i:i+64]).to(device) for k, v in enc.items()}
+                out = base_model(**batch)
+                pooled = out.pooler_output  # same pooler your frozen classifier sees
+                feats.append(pooled.cpu().numpy())
+        return np.concatenate(feats)
+
+    X_train, X_val = get_pooled(train_enc), get_pooled(val_enc)
+    y_train, y_val = train_df["label"].values, val_df["label"].values
+
+    clf = LogisticRegression(max_iter=1000)
+    clf.fit(X_train, y_train)
+    preds = clf.predict(X_val)
+    print("sklearn LogisticRegression val acc:", accuracy_score(y_val, preds))
+    print("sklearn LogisticRegression val macro-f1:", f1_score(y_val, preds, average="macro"))
+
+extract_and_probe("bert")
