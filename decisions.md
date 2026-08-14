@@ -55,6 +55,9 @@ Why: Colab sessions are ephemeral; one train.py fixes bugs once instead of six t
 Trades away: slight setup overhead on Day 1 morning; repays itself by Stage 2.
 
 ---
+**D-12 | Stage 1 | Verified test.csv is perfectly class-balanced (40 examples/class); 
+train.csv has mild natural imbalance (~1.77%–1.87% for top classes). 
+Stratified train/val split preserves train's distribution; macro-F1 (D-10) already accounts for this.**
 
 ## Stage 1 entries (fill during execution)
 
