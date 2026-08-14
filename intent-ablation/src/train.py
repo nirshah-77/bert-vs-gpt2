@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.optim import AdamW
 from sklearn.metrics import accuracy_score, f1_score
 import pandas as pd
+from transformers import get_linear_schedule_with_warmup   # add this import at the top
 
 from config import (
     HYPERPARAMS, BATCH_SIZE, EARLY_STOPPING_PATIENCE,
@@ -79,6 +80,12 @@ def run(model_name, strategy, seed):
     max_epochs = HYPERPARAMS[strategy]["max_epochs"]
     optimizer = AdamW(model.parameters(), lr=lr)
 
+    total_steps = len(train_loader) * max_epochs                          # fix — needed for warmup schedule
+    warmup_steps = int(0.1 * total_steps)                                 # 10% warmup, per config table's "AdamW, linear warmup 10%"
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+    )
+
     best_val_acc = -1
     patience_counter = 0
     epochs_ran = 0
@@ -92,6 +99,7 @@ def run(model_name, strategy, seed):
             loss = outputs.loss
             loss.backward()
             optimizer.step()
+            scheduler.step()   
             optimizer.zero_grad()
 
         val_acc, val_f1 = evaluate(model, val_loader, device)
