@@ -1,6 +1,8 @@
 transformers
 datasets
-torch
 peft
+accelerate
 scikit-learn
 pandas
+torch
+torchao>=0.16.0
