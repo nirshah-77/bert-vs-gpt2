@@ -23,12 +23,12 @@ MODEL_NAMES = {
 }
 
 HYPERPARAMS = {
-    "frozen": {"lr": 1e-3, "max_epochs": 100},
+    "frozen": {"lr": 1e-3, "max_epochs": 50},
     "lora":   {"lr": 2e-4, "max_epochs": 6},
     "full":   {"lr": 2e-5, "max_epochs": 4},
 }
 
-EARLY_STOPPING_PATIENCE = 2
+EARLY_STOPPING_PATIENCE = 7
 
 LORA_CONFIG = {
     "r": 8,
