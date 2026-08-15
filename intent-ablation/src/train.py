@@ -445,7 +445,7 @@ def run(model_name, strategy, seed):
                 loss = outputs.loss
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
+                # scheduler.step()
                 optimizer.zero_grad()
                 if step % 20 == 0:
                     print(f"  epoch {epoch+1} step {step}/{len(train_loader)} — loss {loss.item():.4f}", flush=True)
