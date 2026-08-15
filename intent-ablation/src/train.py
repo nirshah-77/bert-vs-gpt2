@@ -339,8 +339,8 @@ def run(model_name, strategy, seed):
             scheduler.step()
             optimizer.zero_grad()
 
-            # if step % 20 == 0:                                     # fix — visible per-step progress
-            #     print(f"  epoch {epoch+1} step {step}/{len(train_loader)} — loss {loss.item():.4f}", flush=True)
+            if step % 20 == 0:                                     # fix — visible per-step progress
+                print(f"  epoch {epoch+1} step {step}/{len(train_loader)} — loss {loss.item():.4f}", flush=True)
 
         val_acc, val_f1 = evaluate(model, val_loader, device)
         epochs_ran = epoch + 1
