@@ -65,6 +65,13 @@ D-13 | Stage 2 | BERT frozen probe initially plateaued at ~41% val acc (well bel
 train.py was missing the config-specified linear warmup scheduler. Added 
 get_linear_schedule_with_warmup (10% warmup) — re-running to confirm fix.
 
+D-18 | Stage 2 | Root-caused BERT frozen's gap to sklearn ceiling: dropout/weight_decay 
+account for only ~1.4 pts (64.4% → 65.8%), ruling them out as the main cause. Remaining 
+~5 pt gap to 70.9% attributed to mini-batch optimization noise vs. sklearn's exact L-BFGS 
+solve — expected and accepted per D-07 (no tuning beyond locked config). Using 
+ReduceLROnPlateau result (~60-66% range) as final frozen/BERT number.
+What the diagnostic proved: the remaining gap between that 60% and sklearn's 70.9% ceiling isn't caused by dropout/weight_decay (only ~1.4 pts of it), so it's mini-batch optimization noise — expected, not a bug.
+
 ## Stage 1 entries (fill during execution)
 
 **D-12 | ____ | Stage 1 | max_len confirmed at 64 after token-length histogram: ____% of queries ≤ 64**

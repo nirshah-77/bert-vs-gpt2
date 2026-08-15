@@ -425,8 +425,8 @@ def run(model_name, strategy, seed):
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
-                if step % 20 == 0:
-                    print(f"  epoch {epoch+1} step {step}/{len(train_feat_loader)} — loss {loss.item():.4f}", flush=True)
+                # if step % 20 == 0:
+                #     print(f"  epoch {epoch+1} step {step}/{len(train_feat_loader)} — loss {loss.item():.4f}", flush=True)
         else:
             for step, batch in enumerate(train_loader):
                 batch = {k: v.to(device) for k, v in batch.items()}
