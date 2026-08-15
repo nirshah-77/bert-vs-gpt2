@@ -296,7 +296,8 @@ def evaluate(model, loader, device, is_cached=False):
                 preds = outputs.logits.argmax(dim=-1)
                 labels = batch["labels"]
             all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.numpy() if isinstance(labels, torch.Tensor) else labels)
+            # all_labels.extend(labels.numpy() if isinstance(labels, torch.Tensor) else labels)
+            all_labels.extend(labels.cpu().numpy() if isinstance(labels, torch.Tensor) else labels)
     return accuracy_score(all_labels, all_preds), f1_score(all_labels, all_preds, average="macro")
 
 
