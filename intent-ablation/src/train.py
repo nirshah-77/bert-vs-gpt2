@@ -118,8 +118,8 @@ def run(model_name, strategy, seed):
                 print(f"Early stopping at epoch {epochs_ran}")
                 break
         
-        if best_model_state is not None:
-            model.load_state_dict(best_model_state) 
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state) 
 
     train_minutes = (time.time() - start_time) / 60
 
