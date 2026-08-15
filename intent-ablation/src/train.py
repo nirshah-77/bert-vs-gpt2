@@ -1,3 +1,4 @@
+from sklearn import linear_model
 import time
 import os
 from datetime import datetime
@@ -87,43 +88,117 @@ def run(model_name, strategy, seed):
         optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
     )
 
+    # best_val_acc = -1
+    # patience_counter = 0
+    # epochs_ran = 0
+    # start_time = time.time()
+
+    # for epoch in range(max_epochs):
+    #     model.train()
+    #     for batch in train_loader:
+    #         batch = {k: v.to(device) for k, v in batch.items()}
+    #         outputs = model(**batch)
+    #         loss = outputs.loss
+    #         loss.backward()
+    #         optimizer.step()
+    #         scheduler.step()   
+    #         optimizer.zero_grad()
+
+    #     val_acc, val_f1 = evaluate(model, val_loader, device)
+    #     epochs_ran = epoch + 1
+    #     print(f"[{model_name}/{strategy}/seed{seed}] epoch {epochs_ran} — val_acc {val_acc:.4f} | val_f1 {val_f1:.4f}")
+
+    #     if val_acc > best_val_acc:
+    #         best_val_acc = val_acc
+    #         best_val_f1 = val_f1                                    # tracked but not the selection criterion
+    #         best_model_state = copy.deepcopy(model.state_dict())    # fix — snapshot weights, not just the number
+    #         patience_counter = 0
+    #     else:
+    #         patience_counter += 1
+    #         if patience_counter >= EARLY_STOPPING_PATIENCE:
+    #             print(f"Early stopping at epoch {epochs_ran}")
+    #             break
+        
+    # if best_model_state is not None:
+    #     model.load_state_dict(best_model_state) 
+
+    # train_minutes = (time.time() - start_time) / 60
+
+    # test_acc, test_f1 = evaluate(model, test_loader, device)           # test touched only here (D-03)
+
+
     best_val_acc = -1
+    best_val_f1 = -1
+    best_epoch = 0
+    best_model_state = None
+
     patience_counter = 0
     epochs_ran = 0
+
     start_time = time.time()
 
     for epoch in range(max_epochs):
+
         model.train()
+
         for batch in train_loader:
             batch = {k: v.to(device) for k, v in batch.items()}
+
             outputs = model(**batch)
             loss = outputs.loss
+
             loss.backward()
+
             optimizer.step()
-            scheduler.step()   
+            scheduler.step()
             optimizer.zero_grad()
 
+        # Validation
         val_acc, val_f1 = evaluate(model, val_loader, device)
-        epochs_ran = epoch + 1
-        print(f"[{model_name}/{strategy}/seed{seed}] epoch {epochs_ran} — val_acc {val_acc:.4f} | val_f1 {val_f1:.4f}")
 
+        epochs_ran = epoch + 1
+
+        print(
+            f"[{model_name}/{strategy}/seed{seed}] "
+            f"epoch {epochs_ran} — "
+            f"val_acc {val_acc:.4f} | "
+            f"val_f1 {val_f1:.4f}"
+        )
+
+        # Check whether this is the best checkpoint
         if val_acc > best_val_acc:
+
             best_val_acc = val_acc
-            best_val_f1 = val_f1                                    # tracked but not the selection criterion
-            best_model_state = copy.deepcopy(model.state_dict())    # fix — snapshot weights, not just the number
+            best_val_f1 = val_f1
+            best_epoch = epochs_ran
+
+            best_model_state = copy.deepcopy(model.state_dict())
+
             patience_counter = 0
+
         else:
+
             patience_counter += 1
+
             if patience_counter >= EARLY_STOPPING_PATIENCE:
                 print(f"Early stopping at epoch {epochs_ran}")
                 break
-        
+
+
+    # Restore best checkpoint
     if best_model_state is not None:
-        model.load_state_dict(best_model_state) 
+        model.load_state_dict(best_model_state)
 
-    train_minutes = (time.time() - start_time) / 60
+    print(
+        f"Best checkpoint: epoch {best_epoch} "
+        f"| val_acc {best_val_acc:.4f} "
+        f"| val_f1 {best_val_f1:.4f}"
+    )
 
-    test_acc, test_f1 = evaluate(model, test_loader, device)           # test touched only here (D-03)
+    # Test ONLY after best checkpoint has been restored
+    test_acc, test_f1 = evaluate(model, test_loader, device)
+
+
 
     # save checkpoint only for lora/full, and only if this is the best seed so far (Drive structure decision)
     if strategy in ("lora", "full"):
