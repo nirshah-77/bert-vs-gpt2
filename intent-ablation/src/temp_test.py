@@ -99,17 +99,55 @@
 
 # extract_and_probe("bert")
 
-from data import get_data
-from model import build_model
+# from data import get_data
+# from model import build_model
 
-_, val_enc, _, tokenizer = get_data("gpt2")
-print("padding_side:", tokenizer.padding_side)
-print("pad_token_id (tokenizer):", tokenizer.pad_token_id)
-print("eos_token_id:", tokenizer.eos_token_id)
+# _, val_enc, _, tokenizer = get_data("gpt2")
+# print("padding_side:", tokenizer.padding_side)
+# print("pad_token_id (tokenizer):", tokenizer.pad_token_id)
+# print("eos_token_id:", tokenizer.eos_token_id)
 
-model = build_model("gpt2", "frozen")
-print("pad_token_id (model.config):", model.config.pad_token_id)
+# model = build_model("gpt2", "frozen")
+# print("pad_token_id (model.config):", model.config.pad_token_id)
 
-example = val_enc["input_ids"][0]
-print("Decoded example:", tokenizer.decode(example))
-print("Raw ids:", example)
+# example = val_enc["input_ids"][0]
+# print("Decoded example:", tokenizer.decode(example))
+# print("Raw ids:", example)
+
+import torch
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score
+from transformers import AutoModel
+
+from data import get_data, train_df, val_df
+
+def extract_and_probe_gpt2():
+    train_enc, val_enc, _, tokenizer = get_data("gpt2")
+    base_model = AutoModel.from_pretrained("gpt2")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    base_model.to(device).eval()
+    base_model.config.pad_token_id = tokenizer.pad_token_id
+
+    def get_last_token_pooled(enc):
+        feats = []
+        with torch.no_grad():
+            for i in range(0, len(enc["input_ids"]), 64):
+                batch = {k: torch.tensor(v[i:i+64]).to(device) for k, v in enc.items()}
+                out = base_model(**batch)
+                attn_mask = batch["attention_mask"]
+                last_idx = attn_mask.sum(dim=1) - 1
+                pooled = out.last_hidden_state[torch.arange(out.last_hidden_state.size(0)), last_idx]
+                feats.append(pooled.cpu().numpy())
+        return np.concatenate(feats)
+
+    X_train, X_val = get_last_token_pooled(train_enc), get_last_token_pooled(val_enc)
+    y_train, y_val = train_df["label"].values, val_df["label"].values
+
+    clf = LogisticRegression(max_iter=1000)
+    clf.fit(X_train, y_train)
+    preds = clf.predict(X_val)
+    print("sklearn LogisticRegression (GPT-2 last-token) val acc:", accuracy_score(y_val, preds))
+    print("sklearn LogisticRegression (GPT-2 last-token) val macro-f1:", f1_score(y_val, preds, average="macro"))
+
+extract_and_probe_gpt2()
