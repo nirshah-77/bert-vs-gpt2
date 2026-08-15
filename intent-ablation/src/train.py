@@ -250,6 +250,7 @@ from datetime import datetime
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from transformers import get_linear_schedule_with_warmup
 from sklearn.metrics import accuracy_score, f1_score
 import pandas as pd
@@ -273,16 +274,29 @@ class IntentDataset(Dataset):
         return item
 
 
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, is_cached=False):
     model.eval()
     all_preds, all_labels = [], []
     with torch.no_grad():
         for batch in loader:
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            preds = outputs.logits.argmax(dim=-1)
+            if is_cached:
+                features = batch["features"].to(device)
+                labels = batch["labels"]
+                if hasattr(model, "bert"):
+                    pooled_output = model.dropout(features)
+                    logits = model.classifier(pooled_output)
+                elif hasattr(model, "transformer"):
+                    logits = model.score(features)
+                else:
+                    raise ValueError("Unknown model architecture")
+                preds = logits.argmax(dim=-1)
+            else:
+                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = model(**batch)
+                preds = outputs.logits.argmax(dim=-1)
+                labels = batch["labels"]
             all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(batch["labels"].cpu().numpy())
+            all_labels.extend(labels.numpy() if isinstance(labels, torch.Tensor) else labels)
     return accuracy_score(all_labels, all_preds), f1_score(all_labels, all_preds, average="macro")
 
 
@@ -292,6 +306,61 @@ def get_prior_best_val_acc(model_key, strategy):
     df = pd.read_csv(RESULTS_CSV)
     subset = df[(df["model"] == model_key) & (df["strategy"] == strategy)]
     return subset["best_val_acc"].max() if len(subset) else -1
+
+
+class FeatureDataset(Dataset):
+    def __init__(self, features, labels):
+        self.features = features
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        return {"features": self.features[idx], "labels": self.labels[idx]}
+
+
+def extract_features(model, loader, device):
+    model.eval()
+    all_features = []
+    all_labels = []
+    with torch.no_grad():
+        for batch in loader:
+            labels = batch["labels"].clone()
+            input_batch = {k: v.to(device) for k, v in batch.items() if k != "labels"}
+            if hasattr(model, "bert"):
+                outputs = model.bert(**input_batch, return_dict=True)
+                features = outputs[1]
+            elif hasattr(model, "transformer"):
+                transformer_outputs = model.transformer(**input_batch, return_dict=True)
+                hidden_states = transformer_outputs.last_hidden_state
+                input_ids = input_batch["input_ids"]
+                batch_size = input_ids.shape[0]
+                if model.config.pad_token_id is None:
+                    last_non_pad_token = -1
+                else:
+                    non_pad_mask = (input_ids != model.config.pad_token_id).to(device, torch.int32)
+                    token_indices = torch.arange(input_ids.shape[-1], device=device, dtype=torch.int32)
+                    last_non_pad_token = (token_indices * non_pad_mask).argmax(-1)
+                features = hidden_states[torch.arange(batch_size, device=device), last_non_pad_token]
+            else:
+                raise ValueError("Unknown model architecture")
+            all_features.append(features.cpu())
+            all_labels.append(labels)
+    return torch.cat(all_features, dim=0), torch.cat(all_labels, dim=0)
+
+
+def forward_classifier(model, features, labels, device):
+    if hasattr(model, "bert"):
+        pooled_output = model.dropout(features.to(device))
+        logits = model.classifier(pooled_output)
+    elif hasattr(model, "transformer"):
+        logits = model.score(features.to(device))
+    else:
+        raise ValueError("Unknown model architecture")
+    loss_fct = torch.nn.CrossEntropyLoss()
+    loss = loss_fct(logits.view(-1, model.config.num_labels), labels.to(device).view(-1))
+    return logits, loss
 
 
 def run(model_name, strategy, seed):
@@ -318,9 +387,27 @@ def run(model_name, strategy, seed):
     max_epochs = HYPERPARAMS[strategy]["max_epochs"]
     optimizer = AdamW(model.parameters(), lr=lr)
 
-    total_steps = len(train_loader) * max_epochs
-    warmup_steps = int(0.1 * total_steps)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+    if strategy == "frozen":
+        scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
+    else:
+        total_steps = len(train_loader) * max_epochs
+        warmup_steps = int(0.1 * total_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+
+    # Feature caching if strategy is frozen
+    if strategy == "frozen":
+        print(f"[{model_name}/{strategy}/seed{seed}] Caching base model features...", flush=True)
+        train_features, train_labels = extract_features(model, train_loader, device)
+        val_features, val_labels = extract_features(model, val_loader, device)
+        test_features, test_labels = extract_features(model, test_loader, device)
+
+        train_feat_ds = FeatureDataset(train_features, train_labels)
+        val_feat_ds = FeatureDataset(val_features, val_labels)
+        test_feat_ds = FeatureDataset(test_features, test_labels)
+
+        train_feat_loader = DataLoader(train_feat_ds, batch_size=BATCH_SIZE, shuffle=True)
+        val_feat_loader = DataLoader(val_feat_ds, batch_size=BATCH_SIZE)
+        test_feat_loader = DataLoader(test_feat_ds, batch_size=BATCH_SIZE)
 
     best_val_acc, best_val_f1, best_epoch = -1, -1, 0
     best_model_state = None
@@ -330,21 +417,39 @@ def run(model_name, strategy, seed):
 
     for epoch in range(max_epochs):
         model.train()
-        for step, batch in enumerate(train_loader):
-            batch = {k: v.to(device) for k, v in batch.items()}
-            outputs = model(**batch)
-            loss = outputs.loss
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
+        if strategy == "frozen":
+            for step, batch in enumerate(train_feat_loader):
+                features = batch["features"].to(device)
+                labels = batch["labels"].to(device)
+                logits, loss = forward_classifier(model, features, labels, device)
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+                if step % 20 == 0:
+                    print(f"  epoch {epoch+1} step {step}/{len(train_feat_loader)} — loss {loss.item():.4f}", flush=True)
+        else:
+            for step, batch in enumerate(train_loader):
+                batch = {k: v.to(device) for k, v in batch.items()}
+                outputs = model(**batch)
+                loss = outputs.loss
+                loss.backward()
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+                if step % 20 == 0:
+                    print(f"  epoch {epoch+1} step {step}/{len(train_loader)} — loss {loss.item():.4f}", flush=True)
 
-            if step % 20 == 0:                                     # fix — visible per-step progress
-                print(f"  epoch {epoch+1} step {step}/{len(train_loader)} — loss {loss.item():.4f}", flush=True)
-
-        val_acc, val_f1 = evaluate(model, val_loader, device)
+        # Validation
+        if strategy == "frozen":
+            val_acc, val_f1 = evaluate(model, val_feat_loader, device, is_cached=True)
+        else:
+            val_acc, val_f1 = evaluate(model, val_loader, device, is_cached=False)
+            
         epochs_ran = epoch + 1
         print(f"[{model_name}/{strategy}/seed{seed}] epoch {epochs_ran} — val_acc {val_acc:.4f} | val_f1 {val_f1:.4f}", flush=True)
+
+        if strategy == "frozen":
+            scheduler.step(val_acc)
 
         if val_acc > best_val_acc:
             best_val_acc, best_val_f1, best_epoch = val_acc, val_f1, epochs_ran
@@ -361,7 +466,10 @@ def run(model_name, strategy, seed):
 
     print(f"Best checkpoint: epoch {best_epoch} | val_acc {best_val_acc:.4f} | val_f1 {best_val_f1:.4f}", flush=True)
 
-    test_acc, test_f1 = evaluate(model, test_loader, device)
+    if strategy == "frozen":
+        test_acc, test_f1 = evaluate(model, test_feat_loader, device, is_cached=True)
+    else:
+        test_acc, test_f1 = evaluate(model, test_loader, device, is_cached=False)
 
     if strategy in ("lora", "full"):
         prior_best = get_prior_best_val_acc(model_name, strategy)

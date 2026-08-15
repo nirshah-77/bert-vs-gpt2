@@ -1,14 +1,27 @@
 # config.py — single source of truth for all hyperparameters and paths
 
-DRIVE_ROOT = "/content/drive/MyDrive/bert-vs-gpt2"
-DATA_DIR = f"{DRIVE_ROOT}/dataset"
-TRAIN_CSV = f"{DATA_DIR}/train.csv"
-TEST_CSV = f"{DATA_DIR}/test.csv"
+import os
 
-RESULTS_DIR = f"{DRIVE_ROOT}/results"
-RESULTS_CSV = f"{RESULTS_DIR}/results.csv"
-MODELS_DIR = f"{DRIVE_ROOT}/models"
-LOGS_DIR = f"{DRIVE_ROOT}/logs"
+if os.path.exists("/content/drive/MyDrive/bert-vs-gpt2"):
+    DRIVE_ROOT = "/content/drive/MyDrive/bert-vs-gpt2"
+else:
+    # Local fallback
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    DRIVE_ROOT = os.path.abspath(os.path.join(current_dir, "../.."))
+
+DATA_DIR = os.path.join(DRIVE_ROOT, "dataset")
+TRAIN_CSV = os.path.join(DATA_DIR, "train.csv")
+TEST_CSV = os.path.join(DATA_DIR, "test.csv")
+
+RESULTS_DIR = os.path.join(DRIVE_ROOT, "results")
+RESULTS_CSV = os.path.join(RESULTS_DIR, "results.csv")
+MODELS_DIR = os.path.join(DRIVE_ROOT, "models")
+LOGS_DIR = os.path.join(DRIVE_ROOT, "logs")
+
+# Ensure directories exist
+os.makedirs(RESULTS_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
 
 NUM_LABELS = 77
 MAX_LEN = 64
@@ -23,7 +36,7 @@ MODEL_NAMES = {
 }
 
 HYPERPARAMS = {
-    "frozen": {"lr": 1e-3, "max_epochs": 100},
+    "frozen": {"lr": 1e-3, "max_epochs": 200},
     "lora":   {"lr": 2e-4, "max_epochs": 6},
     "full":   {"lr": 2e-5, "max_epochs": 4},
 }
