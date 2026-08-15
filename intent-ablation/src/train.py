@@ -301,13 +301,22 @@ def evaluate(model, loader, device, is_cached=False):
     return accuracy_score(all_labels, all_preds), f1_score(all_labels, all_preds, average="macro")
 
 
+# def get_prior_best_val_acc(model_key, strategy):
+#     if not os.path.exists(RESULTS_CSV):
+#         return -1
+#     df = pd.read_csv(RESULTS_CSV)
+#     subset = df[(df["model"] == model_key) & (df["strategy"] == strategy)]
+#     return subset["best_val_acc"].max() if len(subset) else -1
 def get_prior_best_val_acc(model_key, strategy):
     if not os.path.exists(RESULTS_CSV):
         return -1
-    df = pd.read_csv(RESULTS_CSV)
+    try:
+        df = pd.read_csv(RESULTS_CSV)
+    except pd.errors.ParserError:
+        print("Warning: results.csv appears malformed, treating as no prior results.", flush=True)
+        return -1
     subset = df[(df["model"] == model_key) & (df["strategy"] == strategy)]
     return subset["best_val_acc"].max() if len(subset) else -1
-
 
 class FeatureDataset(Dataset):
     def __init__(self, features, labels):

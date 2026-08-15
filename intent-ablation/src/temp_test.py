@@ -152,75 +152,99 @@
 
 # extract_and_probe_gpt2()
 
-import copy
-import torch
-import torch.nn.functional as F
-from torch.optim import AdamW
-from sklearn.metrics import accuracy_score, f1_score
+# import copy
+# import torch
+# import torch.nn.functional as F
+# from torch.optim import AdamW
+# from sklearn.metrics import accuracy_score, f1_score
 
-from data import get_data, train_df, val_df
-from model import build_model
-
-
-def extract_features(base_model, encodings, labels, device, batch_size=64):
-    """Run the frozen base model once; cache pooled features + labels — same idea as the sklearn check."""
-    base_model.eval()
-    feats = []
-    with torch.no_grad():
-        for i in range(0, len(labels), batch_size):
-            batch = {k: torch.tensor(v[i:i+batch_size]).to(device) for k, v in encodings.items()}
-            out = base_model(**batch)
-            feats.append(out.pooler_output.cpu())
-    return torch.cat(feats), torch.tensor(labels)
+# from data import get_data, train_df, val_df
+# from model import build_model
 
 
-def train_classifier(classifier, train_feats, train_labels, val_feats, val_labels, device,
-                      epochs=100, lr=1e-3, weight_decay=0.0, use_dropout=True):
-    classifier = copy.deepcopy(classifier).to(device)
-    if not use_dropout:
-        for m in classifier.modules():
-            if isinstance(m, torch.nn.Dropout):
-                m.p = 0.0                                              # disable dropout for this run
-
-    optimizer = AdamW(classifier.parameters(), lr=lr, weight_decay=weight_decay)
-    best_val_acc = -1
-
-    for epoch in range(epochs):
-        classifier.train()
-        perm = torch.randperm(len(train_labels))
-        for i in range(0, len(perm), 32):
-            idx = perm[i:i+32]
-            logits = classifier(train_feats[idx].to(device))
-            loss = F.cross_entropy(logits, train_labels[idx].to(device))
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-
-        classifier.eval()
-        with torch.no_grad():
-            val_logits = classifier(val_feats.to(device))
-            val_preds = val_logits.argmax(dim=-1).cpu()
-        val_acc = accuracy_score(val_labels, val_preds)
-        best_val_acc = max(best_val_acc, val_acc)
-
-    return best_val_acc
+# def extract_features(base_model, encodings, labels, device, batch_size=64):
+#     """Run the frozen base model once; cache pooled features + labels — same idea as the sklearn check."""
+#     base_model.eval()
+#     feats = []
+#     with torch.no_grad():
+#         for i in range(0, len(labels), batch_size):
+#             batch = {k: torch.tensor(v[i:i+batch_size]).to(device) for k, v in encodings.items()}
+#             out = base_model(**batch)
+#             feats.append(out.pooler_output.cpu())
+#     return torch.cat(feats), torch.tensor(labels)
 
 
-if __name__ == "__main__":
-    train_enc, val_enc, _, _ = get_data("bert")
-    model = build_model("bert", "frozen")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
+# def train_classifier(classifier, train_feats, train_labels, val_feats, val_labels, device,
+#                       epochs=100, lr=1e-3, weight_decay=0.0, use_dropout=True):
+#     classifier = copy.deepcopy(classifier).to(device)
+#     if not use_dropout:
+#         for m in classifier.modules():
+#             if isinstance(m, torch.nn.Dropout):
+#                 m.p = 0.0                                              # disable dropout for this run
 
-    train_feats, train_labels = extract_features(model.base_model, train_enc, train_df["label"].values, device)
-    val_feats, val_labels = extract_features(model.base_model, val_enc, val_df["label"].values, device)
+#     optimizer = AdamW(classifier.parameters(), lr=lr, weight_decay=weight_decay)
+#     best_val_acc = -1
 
-    print("Baseline (current setup — dropout on, weight_decay=0.01):", flush=True)
-    acc1 = train_classifier(model.classifier, train_feats, train_labels, val_feats, val_labels, device,
-                             weight_decay=0.01, use_dropout=True)
-    print(f"  best val_acc: {acc1:.4f}", flush=True)
+#     for epoch in range(epochs):
+#         classifier.train()
+#         perm = torch.randperm(len(train_labels))
+#         for i in range(0, len(perm), 32):
+#             idx = perm[i:i+32]
+#             logits = classifier(train_feats[idx].to(device))
+#             loss = F.cross_entropy(logits, train_labels[idx].to(device))
+#             loss.backward()
+#             optimizer.step()
+#             optimizer.zero_grad()
 
-    print("No dropout, no weight decay (matches sklearn's conditions):", flush=True)
-    acc2 = train_classifier(model.classifier, train_feats, train_labels, val_feats, val_labels, device,
-                             weight_decay=0.0, use_dropout=False)
-    print(f"  best val_acc: {acc2:.4f}", flush=True)
+#         classifier.eval()
+#         with torch.no_grad():
+#             val_logits = classifier(val_feats.to(device))
+#             val_preds = val_logits.argmax(dim=-1).cpu()
+#         val_acc = accuracy_score(val_labels, val_preds)
+#         best_val_acc = max(best_val_acc, val_acc)
+
+#     return best_val_acc
+
+
+# if __name__ == "__main__":
+#     train_enc, val_enc, _, _ = get_data("bert")
+#     model = build_model("bert", "frozen")
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     model.to(device)
+
+#     train_feats, train_labels = extract_features(model.base_model, train_enc, train_df["label"].values, device)
+#     val_feats, val_labels = extract_features(model.base_model, val_enc, val_df["label"].values, device)
+
+#     print("Baseline (current setup — dropout on, weight_decay=0.01):", flush=True)
+#     acc1 = train_classifier(model.classifier, train_feats, train_labels, val_feats, val_labels, device,
+#                              weight_decay=0.01, use_dropout=True)
+#     print(f"  best val_acc: {acc1:.4f}", flush=True)
+
+#     print("No dropout, no weight decay (matches sklearn's conditions):", flush=True)
+#     acc2 = train_classifier(model.classifier, train_feats, train_labels, val_feats, val_labels, device,
+#                              weight_decay=0.0, use_dropout=False)
+#     print(f"  best val_acc: {acc2:.4f}", flush=True)
+
+from config import RESULTS_CSV
+
+with open(RESULTS_CSV, "r") as f:
+    lines = f.readlines()
+
+for i, line in enumerate(lines, start=1):
+    print(f"line {i} ({line.count(',')+1} fields): {line.strip()}") 
+
+
+import shutil
+from config import RESULTS_CSV
+
+shutil.copy(RESULTS_CSV, RESULTS_CSV + ".corrupted_backup")
+
+HEADER = [
+    "model", "strategy", "seed", "trainable_params", "total_params",
+    "best_val_acc", "test_acc", "test_macro_f1", "epochs_ran",
+    "train_minutes", "timestamp",
+]
+with open(RESULTS_CSV, "w") as f:
+    f.write(",".join(HEADER) + "\n")
+
+print("results.csv reset with clean header. Backup saved at", RESULTS_CSV + ".corrupted_backup")
