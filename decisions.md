@@ -72,6 +72,13 @@ solve — expected and accepted per D-07 (no tuning beyond locked config). Using
 ReduceLROnPlateau result (~60-66% range) as final frozen/BERT number.
 What the diagnostic proved: the remaining gap between that 60% and sklearn's 70.9% ceiling isn't caused by dropout/weight_decay (only ~1.4 pts of it), so it's mini-batch optimization noise — expected, not a bug.
 
+**D-19 | Stage 2 | Frozen-probe matrix complete, 3 seeds each: BERT 58-60% (tight spread), 
+GPT-2 81-82% (tight spread). Result is stable and reproducible, not seed noise. Diverges 
+from plan's naive sanity range (expected BERT > GPT-2) — root-caused via sklearn ceiling 
+checks + scheduler/dropout diagnostics (D-14 through D-18) to a genuine architectural 
+effect: GPT-2's autoregressive last-token pooling outperforms BERT's NSP-trained pooler 
+for this task. Stage 2 gate output met: 6/6 rows logged.**
+
 ## Stage 1 entries (fill during execution)
 
 **D-12 | ____ | Stage 1 | max_len confirmed at 64 after token-length histogram: ____% of queries ≤ 64**
