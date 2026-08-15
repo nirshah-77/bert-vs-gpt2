@@ -209,6 +209,8 @@ def run(model_name, strategy, seed):
             model.save_pretrained(save_dir)
             print(f"New best for {model_name}/{strategy} — saved to {save_dir}")
 
+    train_minutes = (time.time() - start_time) / 60
+
     row = {
         "model": model_name,
         "strategy": strategy,

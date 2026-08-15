@@ -12,7 +12,10 @@ def build_model(model_key, strategy):
     )
 
     if model_key == "gpt2":                                                # GPT-2 pad-token fix, half 2 of 2 (half 1 is in data.py's tokenizer)
-        _, _, _, tokenizer = get_data(model_key)                            # need tokenizer's pad_token_id to set on model config
+        from transformers import AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
         model.config.pad_token_id = tokenizer.pad_token_id                  # without this, last-token pooling reads a pad position → garbage accuracy (plan's non-negotiable #1)
 
     if strategy == "frozen":                                               # Stage 1 — frozen strategy
