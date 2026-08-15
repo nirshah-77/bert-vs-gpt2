@@ -402,7 +402,8 @@ def run(model_name, strategy, seed):
     else:
         total_steps = len(train_loader) * max_epochs
         warmup_steps = int(0.1 * total_steps)
-        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+        # scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+        scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
 
     # Feature caching if strategy is frozen
     if strategy == "frozen":
