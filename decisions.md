@@ -57,7 +57,13 @@ Trades away: slight setup overhead on Day 1 morning; repays itself by Stage 2.
 ---
 **D-12 | Stage 1 | Verified test.csv is perfectly class-balanced (40 examples/class); 
 train.csv has mild natural imbalance (~1.77%–1.87% for top classes). 
-Stratified train/val split preserves train's distribution; macro-F1 (D-10) already accounts for this.**
+Stratified train/val split preserves train's distribution; macro-F1 (D-10) already accounts for this.*
+
+D-13 | Stage 2 | BERT frozen probe initially plateaued at ~41% val acc (well below plan's 
+75-87% sanity range). Diagnosed via sklearn LogisticRegression on same frozen features → 
+70.9% val acc, confirming the feature quality was fine and the training loop had a bug: 
+train.py was missing the config-specified linear warmup scheduler. Added 
+get_linear_schedule_with_warmup (10% warmup) — re-running to confirm fix.
 
 ## Stage 1 entries (fill during execution)
 

@@ -8,6 +8,7 @@ from torch.optim import AdamW
 from sklearn.metrics import accuracy_score, f1_score
 import pandas as pd
 from transformers import get_linear_schedule_with_warmup   # add this import at the top
+import copy
 
 from config import (
     HYPERPARAMS, BATCH_SIZE, EARLY_STOPPING_PATIENCE,
@@ -108,12 +109,17 @@ def run(model_name, strategy, seed):
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
+            best_val_f1 = val_f1                                    # tracked but not the selection criterion
+            best_model_state = copy.deepcopy(model.state_dict())    # fix — snapshot weights, not just the number
             patience_counter = 0
         else:
             patience_counter += 1
-            if patience_counter >= EARLY_STOPPING_PATIENCE:            # D-05's early stopping rule
+            if patience_counter >= EARLY_STOPPING_PATIENCE:
                 print(f"Early stopping at epoch {epochs_ran}")
                 break
+        
+        if best_model_state is not None:
+            model.load_state_dict(best_model_state) 
 
     train_minutes = (time.time() - start_time) / 60
 
