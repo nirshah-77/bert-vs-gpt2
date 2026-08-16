@@ -38,7 +38,7 @@ MODEL_NAMES = {
 HYPERPARAMS = {
     "frozen": {"lr": 1e-3, "max_epochs": 200},
     "lora":   {"lr": 2e-4, "max_epochs": 35},
-    "full":   {"lr": 2e-5, "max_epochs": 4},
+    "full":   {"lr": 2e-5, "max_epochs": 30},
 }
 
 EARLY_STOPPING_PATIENCE = 8

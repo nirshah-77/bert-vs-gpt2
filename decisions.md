@@ -79,6 +79,11 @@ checks + scheduler/dropout diagnostics (D-14 through D-18) to a genuine architec
 effect: GPT-2's autoregressive last-token pooling outperforms BERT's NSP-trained pooler 
 for this task. Stage 2 gate output met: 6/6 rows logged.**
 
+**D-20 | Stage 3 | LoRA matrix complete, 3 seeds each: BERT 89.2-90.0%, GPT-2 91.2-92.1%. 
+Gap to frozen: BERT +~30pts, GPT-2 +~10pts — BERT/GPT-2 gap collapses from ~23pts (frozen) 
+to ~2pts (LoRA). Core finding: architecture dominates when frozen, but even minimal (~0.3%) 
+targeted adaptation closes nearly the entire encoder/decoder gap.**
+
 ## Stage 1 entries (fill during execution)
 
 **D-12 | ____ | Stage 1 | max_len confirmed at 64 after token-length histogram: ____% of queries ≤ 64**
