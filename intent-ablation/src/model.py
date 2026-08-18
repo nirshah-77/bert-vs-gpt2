@@ -63,6 +63,22 @@ from data import get_data                                       # reused to fetc
 
 
 class CustomBertForSequenceClassification(BertForSequenceClassification):
+    def __init__(self, config):
+        super().__init__(config)
+        # Redefine the classifier head with a non-linear MLP
+        intermediate_dim = config.hidden_size // 2
+        self.classifier = nn.Sequential(
+            nn.Linear(config.hidden_size, intermediate_dim),
+            nn.GELU(),
+            nn.Linear(intermediate_dim, config.num_labels)
+        )
+        # Initialize new classifier weights
+        for module in self.classifier.modules():
+            if isinstance(module, nn.Linear):
+                module.weight.data.normal_(mean=0.0, std=config.initializer_range)
+                if module.bias is not None:
+                    module.bias.data.zero_()
+
     def forward(
         self,
         input_ids=None,
@@ -145,6 +161,19 @@ def build_model(model_key, strategy):
     if model_key == "gpt2":
         _, _, _, tokenizer = get_data(model_key)                 # fix — reuse get_data's tokenizer, don't reload separately
         model.config.pad_token_id = tokenizer.pad_token_id
+        # Redefine the classification head with a non-linear MLP
+        intermediate_dim = model.config.n_embd // 2
+        model.score = nn.Sequential(
+            nn.Linear(model.config.n_embd, intermediate_dim),
+            nn.GELU(),
+            nn.Linear(intermediate_dim, NUM_LABELS)
+        )
+        # Initialize new classifier weights
+        for module in model.score.modules():
+            if isinstance(module, nn.Linear):
+                module.weight.data.normal_(mean=0.0, std=model.config.initializer_range)
+                if module.bias is not None:
+                    module.bias.data.zero_()
 
     if strategy == "frozen":
         for param in model.base_model.parameters():
