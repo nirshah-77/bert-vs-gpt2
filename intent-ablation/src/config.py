@@ -41,7 +41,7 @@ HYPERPARAMS = {
     "full":   {"lr": 2e-5, "max_epochs": 30},
 }
 
-EARLY_STOPPING_PATIENCE = 8
+EARLY_STOPPING_PATIENCE = 3
 
 LORA_CONFIG = {
     "r": 8,
