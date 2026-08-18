@@ -91,10 +91,14 @@ class CustomBertForSequenceClassification(BertForSequenceClassification):
         )
 
         # Bypassing the implicit pooler (outputs[1]) and extracting the raw [CLS] token representation
-        cls_representation = outputs.last_hidden_state[:, 0, :]
+        # cls_representation = outputs.last_hidden_state[:, 0, :]
 
-        pooled_output = self.dropout(cls_representation)
-        logits = self.classifier(pooled_output)
+        # pooled_output = self.dropout(cls_representation)
+        # logits = self.classifier(pooled_output)
+
+        cls_representation = outputs.last_hidden_state[:, 0, :]
+        dropped_cls = self.dropout(cls_representation)
+        logits = self.classifier(dropped_cls)
 
         loss = None
         if labels is not None:
